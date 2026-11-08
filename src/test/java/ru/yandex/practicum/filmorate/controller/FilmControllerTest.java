@@ -1,5 +1,10 @@
 package ru.yandex.practicum.filmorate.controller;
 
+import jakarta.validation.ConstraintViolation;
+import jakarta.validation.Validation;
+import jakarta.validation.Validator;
+import jakarta.validation.ValidatorFactory;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import ru.yandex.practicum.filmorate.exception.NotFoundException;
@@ -8,13 +13,23 @@ import ru.yandex.practicum.filmorate.model.Film;
 
 import java.time.LocalDate;
 import java.util.Collection;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class FilmControllerTest {
+    private static Validator validator;
     private FilmController filmController;
+
+    @BeforeAll
+    static void setUpValidator() {
+        ValidatorFactory factory = Validation.buildDefaultValidatorFactory();
+        validator = factory.getValidator();
+    }
 
     @BeforeEach
     void setUp() {
@@ -42,90 +57,101 @@ class FilmControllerTest {
     }
 
     @Test
-    void createFilm_nullFilm_throwsValidationException() {
-        assertThrows(ValidationException.class, () -> filmController.create(null));
+    void validateFilm_valid_noViolations() {
+        Film film = createValidFilm();
+        Set<ConstraintViolation<Film>> violations = validator.validate(film);
+
+        assertTrue(violations.isEmpty());
     }
 
     @Test
-    void createFilm_nullName_throwsValidationException() {
+    void validateFilm_nullName_hasViolations() {
         Film film = createValidFilm();
         film.setName(null);
 
-        assertThrows(ValidationException.class, () -> filmController.create(film));
+        Set<ConstraintViolation<Film>> violations = validator.validate(film);
+        assertFalse(violations.isEmpty());
     }
 
     @Test
-    void createFilm_emptyName_throwsValidationException() {
+    void validateFilm_emptyName_hasViolations() {
         Film film = createValidFilm();
         film.setName("");
 
-        assertThrows(ValidationException.class, () -> filmController.create(film));
+        Set<ConstraintViolation<Film>> violations = validator.validate(film);
+        assertFalse(violations.isEmpty());
     }
 
     @Test
-    void createFilm_blankName_throwsValidationException() {
+    void validateFilm_blankName_hasViolations() {
         Film film = createValidFilm();
         film.setName("   ");
 
-        assertThrows(ValidationException.class, () -> filmController.create(film));
+        Set<ConstraintViolation<Film>> violations = validator.validate(film);
+        assertFalse(violations.isEmpty());
     }
 
     @Test
-    void createFilm_descriptionExact200Chars_success() {
+    void validateFilm_descriptionExact200Chars_noViolations() {
         Film film = createValidFilm();
         film.setDescription("a".repeat(200));
 
-        Film created = filmController.create(film);
-        assertEquals(200, created.getDescription().length());
+        Set<ConstraintViolation<Film>> violations = validator.validate(film);
+        assertTrue(violations.isEmpty());
     }
 
     @Test
-    void createFilm_description201Chars_throwsValidationException() {
+    void validateFilm_description201Chars_hasViolations() {
         Film film = createValidFilm();
         film.setDescription("a".repeat(201));
 
-        assertThrows(ValidationException.class, () -> filmController.create(film));
+        Set<ConstraintViolation<Film>> violations = validator.validate(film);
+        assertFalse(violations.isEmpty());
     }
 
     @Test
-    void createFilm_releaseDateBoundary18951228_success() {
+    void validateFilm_releaseDateBoundary18951228_noViolations() {
         Film film = createValidFilm();
         film.setReleaseDate(LocalDate.of(1895, 12, 28));
 
-        Film created = filmController.create(film);
-        assertEquals(LocalDate.of(1895, 12, 28), created.getReleaseDate());
+        Set<ConstraintViolation<Film>> violations = validator.validate(film);
+        assertTrue(violations.isEmpty());
     }
 
     @Test
-    void createFilm_releaseDateBefore18951228_throwsValidationException() {
+    void validateFilm_releaseDateBefore18951228_hasViolations() {
         Film film = createValidFilm();
         film.setReleaseDate(LocalDate.of(1895, 12, 27));
 
-        assertThrows(ValidationException.class, () -> filmController.create(film));
+        Set<ConstraintViolation<Film>> violations = validator.validate(film);
+        assertFalse(violations.isEmpty());
     }
 
     @Test
-    void createFilm_nullReleaseDate_throwsValidationException() {
+    void validateFilm_nullReleaseDate_hasViolations() {
         Film film = createValidFilm();
         film.setReleaseDate(null);
 
-        assertThrows(ValidationException.class, () -> filmController.create(film));
+        Set<ConstraintViolation<Film>> violations = validator.validate(film);
+        assertFalse(violations.isEmpty());
     }
 
     @Test
-    void createFilm_zeroDuration_throwsValidationException() {
+    void validateFilm_zeroDuration_hasViolations() {
         Film film = createValidFilm();
         film.setDuration(0);
 
-        assertThrows(ValidationException.class, () -> filmController.create(film));
+        Set<ConstraintViolation<Film>> violations = validator.validate(film);
+        assertFalse(violations.isEmpty());
     }
 
     @Test
-    void createFilm_negativeDuration_throwsValidationException() {
+    void validateFilm_negativeDuration_hasViolations() {
         Film film = createValidFilm();
         film.setDuration(-10);
 
-        assertThrows(ValidationException.class, () -> filmController.create(film));
+        Set<ConstraintViolation<Film>> violations = validator.validate(film);
+        assertFalse(violations.isEmpty());
     }
 
     @Test
@@ -140,11 +166,6 @@ class FilmControllerTest {
         assertEquals("Начало", updated.getName());
         assertEquals(148, updated.getDuration());
         assertEquals(1, filmController.findAll().size());
-    }
-
-    @Test
-    void updateFilm_nullFilm_throwsValidationException() {
-        assertThrows(ValidationException.class, () -> filmController.update(null));
     }
 
     @Test
