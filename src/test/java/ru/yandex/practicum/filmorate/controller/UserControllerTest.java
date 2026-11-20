@@ -10,9 +10,13 @@ import org.junit.jupiter.api.Test;
 import ru.yandex.practicum.filmorate.exception.NotFoundException;
 import ru.yandex.practicum.filmorate.exception.ValidationException;
 import ru.yandex.practicum.filmorate.model.User;
+import ru.yandex.practicum.filmorate.service.UserService;
+import ru.yandex.practicum.filmorate.storage.user.InMemoryUserStorage;
+import ru.yandex.practicum.filmorate.storage.user.UserStorage;
 
 import java.time.LocalDate;
 import java.util.Collection;
+import java.util.List;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -23,6 +27,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class UserControllerTest {
     private static Validator validator;
+    private UserStorage userStorage;
+    private UserService userService;
     private UserController userController;
 
     @BeforeAll
@@ -33,7 +39,9 @@ class UserControllerTest {
 
     @BeforeEach
     void setUp() {
-        userController = new UserController();
+        userStorage = new InMemoryUserStorage();
+        userService = new UserService(userStorage);
+        userController = new UserController(userService);
     }
 
     private User createValidUser() {
@@ -221,5 +229,94 @@ class UserControllerTest {
 
         Collection<User> all = userController.findAll();
         assertEquals(2, all.size());
+    }
+
+    @Test
+    void findById_valid_returnsUser() {
+        User user = createValidUser();
+        User created = userController.create(user);
+
+        User found = userController.findById(created.getId());
+        assertEquals(created.getId(), found.getId());
+        assertEquals("Иван Иванов", found.getName());
+    }
+
+    @Test
+    void findById_unknownId_throwsNotFoundException() {
+        assertThrows(NotFoundException.class, () -> userController.findById(999L));
+    }
+
+    @Test
+    void addFriend_and_removeFriend_success() {
+        User user1 = userController.create(createValidUser());
+        User user2 = createValidUser();
+        user2.setEmail("friend@example.com");
+        user2.setLogin("friendLogin");
+        user2 = userController.create(user2);
+
+        userController.addFriend(user1.getId(), user2.getId());
+        List<User> user1Friends = userController.getFriends(user1.getId());
+        List<User> user2Friends = userController.getFriends(user2.getId());
+
+        assertEquals(1, user1Friends.size());
+        assertEquals(user2.getId(), user1Friends.get(0).getId());
+        assertEquals(1, user2Friends.size());
+        assertEquals(user1.getId(), user2Friends.get(0).getId());
+
+        userController.removeFriend(user1.getId(), user2.getId());
+        assertTrue(userController.getFriends(user1.getId()).isEmpty());
+        assertTrue(userController.getFriends(user2.getId()).isEmpty());
+    }
+
+    @Test
+    void addFriend_self_throwsValidationException() {
+        User user = userController.create(createValidUser());
+        assertThrows(ValidationException.class, () -> userController.addFriend(user.getId(), user.getId()));
+    }
+
+    @Test
+    void addFriend_unknownUser_throwsNotFoundException() {
+        User user = userController.create(createValidUser());
+        assertThrows(NotFoundException.class, () -> userController.addFriend(999L, user.getId()));
+    }
+
+    @Test
+    void addFriend_unknownFriend_throwsNotFoundException() {
+        User user = userController.create(createValidUser());
+        assertThrows(NotFoundException.class, () -> userController.addFriend(user.getId(), 999L));
+    }
+
+    @Test
+    void removeFriend_unknownUser_throwsNotFoundException() {
+        User user = userController.create(createValidUser());
+        assertThrows(NotFoundException.class, () -> userController.removeFriend(999L, user.getId()));
+    }
+
+    @Test
+    void removeFriend_unknownFriend_throwsNotFoundException() {
+        User user = userController.create(createValidUser());
+        assertThrows(NotFoundException.class, () -> userController.removeFriend(user.getId(), 999L));
+    }
+
+    @Test
+    void getCommonFriends_returnsCommonFriends() {
+        User user1 = userController.create(createValidUser());
+
+        User user2 = createValidUser();
+        user2.setEmail("user2@example.com");
+        user2.setLogin("user2Login");
+        user2 = userController.create(user2);
+
+        User commonFriend = createValidUser();
+        commonFriend.setEmail("common@example.com");
+        commonFriend.setLogin("commonLogin");
+        commonFriend = userController.create(commonFriend);
+
+        userController.addFriend(user1.getId(), commonFriend.getId());
+        userController.addFriend(user2.getId(), commonFriend.getId());
+
+        List<User> common = userController.getCommonFriends(user1.getId(), user2.getId());
+        assertEquals(1, common.size());
+        assertEquals(commonFriend.getId(), common.get(0).getId());
     }
 }
