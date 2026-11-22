@@ -260,12 +260,10 @@ class UserControllerTest {
 
         assertEquals(1, user1Friends.size());
         assertEquals(user2.getId(), user1Friends.get(0).getId());
-        assertEquals(1, user2Friends.size());
-        assertEquals(user1.getId(), user2Friends.get(0).getId());
+        assertTrue(user2Friends.isEmpty());
 
         userController.removeFriend(user1.getId(), user2.getId());
         assertTrue(userController.getFriends(user1.getId()).isEmpty());
-        assertTrue(userController.getFriends(user2.getId()).isEmpty());
     }
 
     @Test
