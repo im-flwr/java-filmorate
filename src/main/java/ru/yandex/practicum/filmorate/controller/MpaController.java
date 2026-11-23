@@ -29,7 +29,7 @@ public class MpaController {
     }
 
     @GetMapping("/{id}")
-    public Mpa findById(@PathVariable int id) {
+    public Mpa findById(@PathVariable Long id) {
         log.info("Получен запрос на получение рейтинга MPA с id = {}", id);
         return mpaService.findById(id);
     }

@@ -1,7 +1,6 @@
 package ru.yandex.practicum.filmorate.service;
 
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 import ru.yandex.practicum.filmorate.exception.NotFoundException;
 import ru.yandex.practicum.filmorate.model.Genre;
@@ -14,7 +13,7 @@ public class GenreService {
     private final GenreStorage genreStorage;
 
     @Autowired
-    public GenreService(@Qualifier("genreDbStorage") GenreStorage genreStorage) {
+    public GenreService(GenreStorage genreStorage) {
         this.genreStorage = genreStorage;
     }
 
@@ -22,7 +21,7 @@ public class GenreService {
         return genreStorage.findAll();
     }
 
-    public Genre findById(int id) {
+    public Genre findById(Long id) {
         return genreStorage.findById(id)
                 .orElseThrow(() -> new NotFoundException("Жанр с id = " + id + " не найден"));
     }

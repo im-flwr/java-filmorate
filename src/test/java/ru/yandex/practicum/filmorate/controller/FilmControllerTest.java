@@ -7,19 +7,21 @@ import jakarta.validation.ValidatorFactory;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 import ru.yandex.practicum.filmorate.exception.NotFoundException;
 import ru.yandex.practicum.filmorate.exception.ValidationException;
 import ru.yandex.practicum.filmorate.model.Film;
 import ru.yandex.practicum.filmorate.model.User;
 import ru.yandex.practicum.filmorate.service.FilmService;
 import ru.yandex.practicum.filmorate.storage.film.FilmStorage;
-import ru.yandex.practicum.filmorate.storage.film.InMemoryFilmStorage;
-import ru.yandex.practicum.filmorate.storage.user.InMemoryUserStorage;
+import ru.yandex.practicum.filmorate.storage.genre.GenreStorage;
+import ru.yandex.practicum.filmorate.storage.mpa.MpaStorage;
 import ru.yandex.practicum.filmorate.storage.user.UserStorage;
 
 import java.time.LocalDate;
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -27,11 +29,16 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 class FilmControllerTest {
     private static Validator validator;
     private FilmStorage filmStorage;
     private UserStorage userStorage;
+    private GenreStorage genreStorage;
+    private MpaStorage mpaStorage;
     private FilmService filmService;
     private FilmController filmController;
 
@@ -43,9 +50,11 @@ class FilmControllerTest {
 
     @BeforeEach
     void setUp() {
-        filmStorage = new InMemoryFilmStorage();
-        userStorage = new InMemoryUserStorage();
-        filmService = new FilmService(filmStorage, userStorage);
+        filmStorage = Mockito.mock(FilmStorage.class);
+        userStorage = Mockito.mock(UserStorage.class);
+        genreStorage = Mockito.mock(GenreStorage.class);
+        mpaStorage = Mockito.mock(MpaStorage.class);
+        filmService = new FilmService(filmStorage, userStorage, genreStorage, mpaStorage);
         filmController = new FilmController(filmService);
     }
 
@@ -70,6 +79,13 @@ class FilmControllerTest {
     @Test
     void createFilm_valid_success() {
         Film film = createValidFilm();
+        when(filmStorage.create(any(Film.class))).thenAnswer(inv -> {
+            Film f = inv.getArgument(0);
+            f.setId(1L);
+            return f;
+        });
+        when(filmStorage.findAll()).thenReturn(List.of(film));
+
         Film created = filmController.create(film);
 
         assertNotNull(created.getId());
@@ -179,11 +195,14 @@ class FilmControllerTest {
     @Test
     void updateFilm_valid_success() {
         Film film = createValidFilm();
-        Film created = filmController.create(film);
+        film.setId(1L);
+        when(filmStorage.findById(1L)).thenReturn(Optional.of(film));
+        when(filmStorage.update(any(Film.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(filmStorage.findAll()).thenReturn(List.of(film));
 
-        created.setName("Начало");
-        created.setDuration(148);
-        Film updated = filmController.update(created);
+        film.setName("Начало");
+        film.setDuration(148);
+        Film updated = filmController.update(film);
 
         assertEquals("Начало", updated.getName());
         assertEquals(148, updated.getDuration());
@@ -200,6 +219,7 @@ class FilmControllerTest {
     void updateFilm_unknownId_throwsNotFoundException() {
         Film film = createValidFilm();
         film.setId(999L);
+        when(filmStorage.findById(999L)).thenReturn(Optional.empty());
 
         assertThrows(NotFoundException.class, () -> filmController.update(film));
     }
@@ -207,11 +227,11 @@ class FilmControllerTest {
     @Test
     void findAll_returnsAllFilms() {
         Film film1 = createValidFilm();
+        film1.setId(1L);
         Film film2 = createValidFilm();
+        film2.setId(2L);
         film2.setName("Матрица");
-
-        filmController.create(film1);
-        filmController.create(film2);
+        when(filmStorage.findAll()).thenReturn(List.of(film1, film2));
 
         Collection<Film> all = filmController.findAll();
         assertEquals(2, all.size());
@@ -220,75 +240,83 @@ class FilmControllerTest {
     @Test
     void findById_valid_returnsFilm() {
         Film film = createValidFilm();
-        Film created = filmController.create(film);
+        film.setId(1L);
+        when(filmStorage.findById(1L)).thenReturn(Optional.of(film));
 
-        Film found = filmController.findById(created.getId());
-        assertEquals(created.getId(), found.getId());
+        Film found = filmController.findById(1L);
+        assertEquals(1L, found.getId());
         assertEquals("Интерстеллар", found.getName());
     }
 
     @Test
     void findById_unknownId_throwsNotFoundException() {
+        when(filmStorage.findById(999L)).thenReturn(Optional.empty());
         assertThrows(NotFoundException.class, () -> filmController.findById(999L));
     }
 
     @Test
     void addLike_and_removeLike_success() {
-        Film film = filmController.create(createValidFilm());
-        User user = userStorage.create(createValidUser());
+        Film film = createValidFilm();
+        film.setId(1L);
+        User user = createValidUser();
+        user.setId(1L);
 
-        filmController.addLike(film.getId(), user.getId());
-        assertTrue(filmController.findById(film.getId()).getLikes().contains(user.getId()));
+        when(filmStorage.findById(1L)).thenReturn(Optional.of(film));
+        when(userStorage.findById(1L)).thenReturn(Optional.of(user));
 
-        filmController.removeLike(film.getId(), user.getId());
-        assertFalse(filmController.findById(film.getId()).getLikes().contains(user.getId()));
+        filmController.addLike(1L, 1L);
+        verify(filmStorage).addLike(1L, 1L);
+
+        filmController.removeLike(1L, 1L);
+        verify(filmStorage).removeLike(1L, 1L);
     }
 
     @Test
     void addLike_unknownFilm_throwsNotFoundException() {
-        User user = userStorage.create(createValidUser());
-        assertThrows(NotFoundException.class, () -> filmController.addLike(999L, user.getId()));
+        when(filmStorage.findById(999L)).thenReturn(Optional.empty());
+        assertThrows(NotFoundException.class, () -> filmController.addLike(999L, 1L));
     }
 
     @Test
     void addLike_unknownUser_throwsNotFoundException() {
-        Film film = filmController.create(createValidFilm());
-        assertThrows(NotFoundException.class, () -> filmController.addLike(film.getId(), 999L));
+        Film film = createValidFilm();
+        film.setId(1L);
+        when(filmStorage.findById(1L)).thenReturn(Optional.of(film));
+        when(userStorage.findById(999L)).thenReturn(Optional.empty());
+
+        assertThrows(NotFoundException.class, () -> filmController.addLike(1L, 999L));
     }
 
     @Test
     void removeLike_unknownFilm_throwsNotFoundException() {
-        User user = userStorage.create(createValidUser());
-        assertThrows(NotFoundException.class, () -> filmController.removeLike(999L, user.getId()));
+        when(filmStorage.findById(999L)).thenReturn(Optional.empty());
+        assertThrows(NotFoundException.class, () -> filmController.removeLike(999L, 1L));
     }
 
     @Test
     void removeLike_unknownUser_throwsNotFoundException() {
-        Film film = filmController.create(createValidFilm());
-        assertThrows(NotFoundException.class, () -> filmController.removeLike(film.getId(), 999L));
+        Film film = createValidFilm();
+        film.setId(1L);
+        when(filmStorage.findById(1L)).thenReturn(Optional.of(film));
+        when(userStorage.findById(999L)).thenReturn(Optional.empty());
+
+        assertThrows(NotFoundException.class, () -> filmController.removeLike(1L, 999L));
     }
 
     @Test
     void getPopular_returnsSortedByLikes() {
-        Film film1 = filmController.create(createValidFilm());
+        Film film1 = createValidFilm();
+        film1.setId(1L);
         Film film2 = createValidFilm();
+        film2.setId(2L);
         film2.setName("Матрица");
-        film2 = filmController.create(film2);
 
-        User user1 = userStorage.create(createValidUser());
-        User user2 = createValidUser();
-        user2.setEmail("user2@example.com");
-        user2.setLogin("user2");
-        user2 = userStorage.create(user2);
-
-        filmController.addLike(film2.getId(), user1.getId());
-        filmController.addLike(film2.getId(), user2.getId());
-        filmController.addLike(film1.getId(), user1.getId());
+        when(filmStorage.getPopular(10)).thenReturn(List.of(film2, film1));
 
         List<Film> popular = filmController.getPopular(10);
         assertEquals(2, popular.size());
-        assertEquals(film2.getId(), popular.get(0).getId());
-        assertEquals(film1.getId(), popular.get(1).getId());
+        assertEquals(2L, popular.get(0).getId());
+        assertEquals(1L, popular.get(1).getId());
     }
 
     @Test

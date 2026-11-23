@@ -10,7 +10,9 @@ import java.util.Optional;
 public interface GenreStorage {
     Collection<Genre> findAll();
 
-    Optional<Genre> findById(int id);
+    Optional<Genre> findById(Long id);
+
+    List<Genre> findAllByIds(Collection<Long> ids);
 
     Map<Long, List<Genre>> getGenresForFilms(List<Long> filmIds);
 }

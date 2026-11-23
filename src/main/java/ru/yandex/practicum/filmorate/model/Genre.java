@@ -10,6 +10,6 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 @EqualsAndHashCode(of = "id")
 public class Genre {
-    private Integer id;
+    private Long id;
     private String name;
 }
