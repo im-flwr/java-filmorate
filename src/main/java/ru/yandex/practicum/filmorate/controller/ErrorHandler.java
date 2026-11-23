@@ -2,6 +2,7 @@ package ru.yandex.practicum.filmorate.controller;
 
 import jakarta.validation.ConstraintViolationException;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -19,6 +20,13 @@ public class ErrorHandler {
     public ErrorResponse handleValidation(final Exception e) {
         log.warn("Ошибка валидации: {}", e.getMessage());
         return new ErrorResponse(e.getMessage());
+    }
+
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ErrorResponse handleDataIntegrityViolation(final DataIntegrityViolationException e) {
+        log.warn("Нарушение целостности данных: {}", e.getMessage());
+        return new ErrorResponse("Нарушение уникальности или целостности данных: " + e.getMessage());
     }
 
     @ExceptionHandler
